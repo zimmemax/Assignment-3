@@ -5,6 +5,7 @@
 #include <sstream>
 #include <bitset>
 #include <cassert>
+#include<cmath>
 using namespace std;
 
 class Record {
@@ -49,6 +50,7 @@ private:
         if (numRecords == 0) {
             // Initialize index with first blocks (start with 4)
 
+
         }
 
         // Add record to the index in the correct block, creating a overflow block if necessary
@@ -62,25 +64,51 @@ private:
 
 public:
 
-    string decToBinary(int num,  int sig_bits, int num_buckets) 
-    { 
-        int max_value = (1 << sig_bits) - 1;
-
-    num %= (num_buckets);
-
-     string binary = "";
-      while (num > 0) {
-         binary = (num % 2 == 0 ? "0" : "1") + binary;
-         num /= 2;
+string decimalToBinary(int num, int i) {
+    string binary;
+    
+    while (num > 0) {
+        binary = std::to_string(num % 2) + binary;
+        num /= 2;
     }
-
-    while (binary.length() < sig_bits) {
+    
+    while (binary.length() < i) {
         binary = "0" + binary;
     }
+    
+    return binary.substr(binary.length() - i);
+}
 
-    return binary.substr(binary.length() - sig_bits);
+//sexy lil helper functions
 
-    } 
+string bit_flip(string bit_string){
+    bit_string[0] = '0';
+    return bit_string;
+
+}
+
+bool need_bit_flip(string num, int n){
+    if(binary_to_decimal(num) >= n){
+        return true;
+    }
+    return false;
+
+}
+
+int binary_to_decimal(string bit_string){
+    int num = 0;
+
+    for(int j=0; j < bit_string.length(); j++){
+        if(bit_string[j]=='1'){
+            num+=pow(2, j);
+        }
+    }
+    return num;
+
+}
+
+    public:
+    string fname;
     LinearHashIndex(string indexFileName) {
         n = 4; // Start with 4 buckets in index
         i = 2; // Need 2 bits to address 4 buckets
@@ -90,9 +118,11 @@ public:
         // Create your EmployeeIndex file and write out the initial 4 buckets
         // make sure to account for the created buckets by incrementing nextFreeBlock appropriately
         ofstream fout(fName);
-        for(int j = 0; j < (i*i); j++){
-            fout<<decToBinary(j, i, n)<< "$"<<'\n';
+
+        for(int j = 0; j < 4; j++){
+            fout << decimalToBinary(j, i) << endl;
         }
+       
         fout.close();
 
       
@@ -121,9 +151,20 @@ public:
         int record_counter = 0;
 
         string page; 
+/*
+        string test = "1111111";
+        cout << binary_to_decimal(test) << endl;
+        cout << need_bit_flip(test, n) << endl;
+        cout << bit_flip(test) << endl;
+        cout << binary_to_decimal(bit_flip(test)) << endl;
+*/
         
-        
+        int line_num = 0;
         while (getline(fin, line)){ 
+
+            if(n > pow(2,i)){
+                i++;
+            }
 
             assert (page.size() <= BLOCK_SIZE);
 
@@ -140,7 +181,14 @@ public:
         
             string record = id + "$" + name + "$" + bio + "$" + manager_id + "$" ;
             int hash = h(stoi(id));
-            string bit_location = decToBinary(hash, i , n);
+            cout << "Hash: " << hash << endl;
+            string bit_location = decimalToBinary(hash, i);
+            if(need_bit_flip(bit_location, n)){
+                bit_location = bit_flip(bit_location);
+            }
+            insert_record(id, bit_location, line_num);
+            n++;
+            line_num++;
             cout << bit_location << endl;
 
         }
@@ -152,5 +200,28 @@ public:
     // Given an ID, find the relevant record and print it
     Record findRecordById(int id) {
         
+    }
+
+    void insert_record(string record_id, string bit_location, int offset){
+       
+       string line;
+    ifstream inFile(fName);
+    ofstream ofile(fName);
+
+
+
+       
+
+        while (getline(inFile, line)) {
+        std::istringstream iss(line);
+        std::string key;
+        std::getline(iss, key, '$'); // Assuming the first field is the search key
+
+        if (key == bit_location) {
+            ofile << line << "$" << record_id << "$" << to_string(offset);
+        } 
+    }
+        
+
     }
 };
