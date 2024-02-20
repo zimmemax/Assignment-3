@@ -5,15 +5,15 @@
 #include <sstream>
 #include <bitset>
 #include <cassert>
-#include<cmath>
+#include <cmath>
 using namespace std;
 
 class Record {
 public:
     int id, manager_id;
-    std::string bio, name;
+    string bio, name;
 
-    Record(vector<std::string> fields) {
+    Record(vector<string> fields) {
         id = stoi(fields[0]);
         name = fields[1];
         bio = fields[2];
@@ -37,6 +37,7 @@ private:
     vector<int> blockDirectory; // Map the least-significant-bits of h(id) to a bucket location in EmployeeIndex (e.g., the jth bucket)
                                 // can scan to correct bucket using j*BLOCK_SIZE as offset (using seek function)
 								// can initialize to a size of 256 (assume that we will never have more than 256 regular (i.e., non-overflow) buckets)
+    
     int n;  // The number of indexes in blockDirectory currently being used
     int i;	// The number of least-significant-bits of h(id) to check. Will need to increase i once n > 2^i
     int numRecords;    // Records currently in index. Used to test whether to increase n
@@ -64,30 +65,35 @@ private:
 
 public:
 
+// num is number [0,255], i is number of bits to consider
 string decimalToBinary(int num, int i) {
     string binary;
     
-    while (num > 0) {
+    while (num > 0) {  // add the all bits to the string binary
         binary = std::to_string(num % 2) + binary;
         num /= 2;
     }
     
-    while (binary.length() < i) {
+    while (binary.length() < i) { //add 0s to the front in the case num has less bits than i's size, ex: num = 1 and i = 10, should return 0000000001
         binary = "0" + binary;
     }
     
-    return binary.substr(binary.length() - i);
+    return binary.substr(binary.length() - i); 
 }
 
 //sexy lil helper functions
 
-string bit_flip(string bit_string){
-    bit_string[0] = '0';
+string bit_flip(string bit_string){ //flips the first bit of the string
+    if (bit_string[0] = '0')
+        bit_string[0] = '1';
+    else
+        bit_string[0] = '0';
+
     return bit_string;
 
 }
 
-bool need_bit_flip(string num, int n){
+bool need_bit_flip(string num, int n){ //
     if(binary_to_decimal(num) >= n){
         return true;
     }
@@ -119,25 +125,28 @@ int binary_to_decimal(string bit_string){
         // make sure to account for the created buckets by incrementing nextFreeBlock appropriately
         ofstream fout(fName);
 
+
         for(int j = 0; j < 4; j++){
             fout << decimalToBinary(j, i) << endl;
         }
        
         fout.close();
-
       
     }
 
     int h(int id){
         return id%216;
     }
+    
+    void reformatPages(){
 
+        return;
+
+    }
     // Read csv file and add records to the index
     void createFromFile(string csvFName) {
 
         ifstream fin(csvFName);
-        
-
 
         string id;
         string manager_id;
@@ -160,10 +169,13 @@ int binary_to_decimal(string bit_string){
 */
         
         int line_num = 0;
-        while (getline(fin, line)){ 
 
-            if(n > pow(2,i)){
+        while (getline(fin, line)){ //reads the entirety of the csv 
+
+            if(n > pow(2,i)){ //when to increment i, only increases if number number of lines gotten is greater than i^2
                 i++;
+
+                reformatPages();
             }
 
             assert (page.size() <= BLOCK_SIZE);
@@ -177,19 +189,44 @@ int binary_to_decimal(string bit_string){
             
             
             
-            vector<std::string> field;
+            vector<string> field;
         
             string record = id + "$" + name + "$" + bio + "$" + manager_id + "$" ;
-            int hash = h(stoi(id));
+            int hash = h(stoi(id)); // hash is an integer [0, 255]
+
             cout << "Hash: " << hash << endl;
-            string bit_location = decimalToBinary(hash, i);
-            if(need_bit_flip(bit_location, n)){
+
+            string bit_location = decimalToBinary(hash, i); // bit_location is a string of 0s and 1s of length 
+
+            
+
+            /*
+            if(need_bit_flip(bit_location, n)){ //not quite sure abt the criteria on this one
                 bit_location = bit_flip(bit_location);
+                cout << "Flipped " << endl;
             }
-            insert_record(id, bit_location, line_num);
+
+            cout << "After flip: " << bit_location << endl;
+
+            */
+
+            
+            int offset = binary_to_decimal(bit_location)* BLOCK_SIZE;
+            insert_record(id, bit_location, offset); //each page is a bucket >:)
+            
+            record_counter++;
+            numRecords++;
+            page += record;
+            cout << "Page: " << page << endl;
+            cout << "Record Counter: " << record_counter << endl;
+            cout << "Num Records: " << numRecords << endl;
+ 
+
+
+
             n++;
             line_num++;
-            cout << bit_location << endl;
+            cout << bit_location << endl; 
 
         }
 
@@ -199,29 +236,32 @@ int binary_to_decimal(string bit_string){
 
     // Given an ID, find the relevant record and print it
     Record findRecordById(int id) {
-        
+        vector <string> fields;
+        Record r(fields);
+        return r;
     }
 
     void insert_record(string record_id, string bit_location, int offset){
        
-       string line;
-    ifstream inFile(fName);
-    ofstream ofile(fName);
+        string line;
+        ifstream inFile(fName);
+        ofstream ofile(fName);
 
 
 
        
 
         while (getline(inFile, line)) {
-        std::istringstream iss(line);
-        std::string key;
-        std::getline(iss, key, '$'); // Assuming the first field is the search key
+            std::istringstream iss(line);
+            std::string key;
+            std::getline(iss, key, '$'); // Assuming the first field is the search key
 
-        if (key == bit_location) {
-            ofile << line << "$" << record_id << "$" << to_string(offset);
-        } 
-    }
-        
+            if (key == bit_location) {
+                ofile << line << "$" << record_id << "$" << to_string(offset);
+            } 
+        }
+            
 
     }
+
 };
