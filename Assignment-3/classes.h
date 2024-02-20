@@ -5,15 +5,15 @@
 #include <sstream>
 #include <bitset>
 #include <cassert>
-#include<cmath>
+#include <cmath>
 using namespace std;
 
 class Record {
 public:
     int id, manager_id;
-    std::string bio, name;
+    string bio, name;
 
-    Record(vector<std::string> fields) {
+    Record(vector<string> fields) {
         id = stoi(fields[0]);
         name = fields[1];
         bio = fields[2];
@@ -37,12 +37,14 @@ private:
     vector<int> blockDirectory; // Map the least-significant-bits of h(id) to a bucket location in EmployeeIndex (e.g., the jth bucket)
                                 // can scan to correct bucket using j*BLOCK_SIZE as offset (using seek function)
 								// can initialize to a size of 256 (assume that we will never have more than 256 regular (i.e., non-overflow) buckets)
+    
     int n;  // The number of indexes in blockDirectory currently being used
     int i;	// The number of least-significant-bits of h(id) to check. Will need to increase i once n > 2^i
     int numRecords;    // Records currently in index. Used to test whether to increase n
     int nextFreeBlock; // Next place to write a bucket. Should increment it by BLOCK_SIZE whenever a bucket is written to EmployeeIndex
     string fName;      // Name of index file
 
+    int storageFill;
     // Insert new record into index
     void insertRecord(Record record) {
 
@@ -64,30 +66,35 @@ private:
 
 public:
 
+// num is number [0,255], i is number of bits to consider
 string decimalToBinary(int num, int i) {
     string binary;
     
-    while (num > 0) {
+    while (num > 0) {  // add the all bits to the string binary
         binary = std::to_string(num % 2) + binary;
         num /= 2;
     }
     
-    while (binary.length() < i) {
+    while (binary.length() < i) { //add 0s to the front in the case num has less bits than i's size, ex: num = 1 and i = 10, should return 0000000001
         binary = "0" + binary;
     }
     
-    return binary.substr(binary.length() - i);
+    return binary.substr(binary.length() - i); 
 }
 
 //sexy lil helper functions
 
-string bit_flip(string bit_string){
-    bit_string[0] = '0';
+string bit_flip(string bit_string){ //flips the first bit of the string
+    if (bit_string[0] = '0')
+        bit_string[0] = '1';
+    else
+        bit_string[0] = '0';
+
     return bit_string;
 
 }
 
-bool need_bit_flip(string num, int n){
+bool need_bit_flip(string num, int n){ //
     if(binary_to_decimal(num) >= n){
         return true;
     }
@@ -119,12 +126,15 @@ int binary_to_decimal(string bit_string){
         // make sure to account for the created buckets by incrementing nextFreeBlock appropriately
         ofstream fout(fName);
 
+
         for(int j = 0; j < 4; j++){
-            fout << decimalToBinary(j, i) << endl;
+            fout << decimalToBinary(j, i);
+            for(int x = 0; x<16*20;x++){
+                fout<<" ";
+            }
         }
        
         fout.close();
-
       
     }
 
@@ -132,12 +142,18 @@ int binary_to_decimal(string bit_string){
         return id%216;
     }
 
+
+    //rehashes every page considering the new i value, must also rewrite the recordPageTracker array
+    void reformatPages(){
+
+        return;
+
+    }
+
     // Read csv file and add records to the index
     void createFromFile(string csvFName) {
 
         ifstream fin(csvFName);
-        
-
 
         string id;
         string manager_id;
@@ -160,10 +176,27 @@ int binary_to_decimal(string bit_string){
 */
         
         int line_num = 0;
-        while (getline(fin, line)){ 
 
-            if(n > pow(2,i)){
+        int recordPageTracker[216];
+        for (int i = 0; i < 216; i++){
+            recordPageTracker[i] = 0;
+        }
+
+        int average_amount_array[216];
+        for(int x = 0; x<216;x++){
+            average_amount_array[x]=0;
+        }
+        float average_fill = 0;
+
+        while (getline(fin, line)){ //reads the entirety of the csv 
+
+
+            int maxStorage = pow(2,i);
+            float percentageRecordsFilled = n / maxStorage;
+
+            if(percentageRecordsFilled > 70.0){ //i should only increase when average number of fill reaches above 70 %
                 i++;
+                reformatPages();
             }
 
             assert (page.size() <= BLOCK_SIZE);
@@ -177,19 +210,60 @@ int binary_to_decimal(string bit_string){
             
             
             
-            vector<std::string> field;
+            vector<string> field;
         
             string record = id + "$" + name + "$" + bio + "$" + manager_id + "$" ;
-            int hash = h(stoi(id));
+            int hash = h(stoi(id)); // hash is an integer [0, 255]
+
+
             cout << "Hash: " << hash << endl;
-            string bit_location = decimalToBinary(hash, i);
-            if(need_bit_flip(bit_location, n)){
+
+            string bit_location = decimalToBinary(hash, i); // ex: 010 
+            cout << "Bit Location: " << bit_location << endl;
+            
+            
+            
+
+
+            /*
+            if(need_bit_flip(bit_location, n)){ //not quite sure abt the criteria on this one
                 bit_location = bit_flip(bit_location);
+                cout << "Flipped " << endl;
             }
-            insert_record(id, bit_location, line_num);
-            n++;
+
+            cout << "After flip: " << bit_location << endl;
+
+            */
+            int whereToStore = 20 * 16 * binary_to_decimal(bit_location) + 16 * recordPageTracker[binary_to_decimal(bit_location)]; //20 is the number of entries possible in a bucket, 16 is the size of each record on the page, 
+            string offset = decimalToBinary(line_num, 8);
+
+            cout << "Where to store: " << whereToStore << endl;
+            cout << "Offset: " << offset << endl;
+
+
+            insert_record(id, whereToStore, offset); //each page is a bucket >:)
+
+            recordPageTracker[binary_to_decimal(bit_location)]++; // this array will tell us where we've placed every single record. We can see if pages are full, i.e. recordpagetracker[i] > 5. We can also use it to track offset.
+            
+
+           
+            numRecords++;
+            
+            
+            cout << "Num Records: " << numRecords << endl;
+            int bit_location_to_int = binary_to_decimal(bit_location);
+            average_amount_array[bit_location_to_int] +=1;
+
+            for(int x =0; x<216;x++){
+                average_fill += average_amount_array[x];
+            }
+            average_fill = average_fill/n;
+            cout << "Average fill: " << average_fill << endl;
+
+
+           
             line_num++;
-            cout << bit_location << endl;
+            
 
         }
 
@@ -199,29 +273,39 @@ int binary_to_decimal(string bit_string){
 
     // Given an ID, find the relevant record and print it
     Record findRecordById(int id) {
-        
+        vector <string> fields;
+        Record r(fields);
+        return r;
     }
 
-    void insert_record(string record_id, string bit_location, int offset){
+
+
+
+    void insert_record(string record_id, int whereToStore, string offset){
        
-       string line;
-    ifstream inFile(fName);
-    ofstream ofile(fName);
+        //string line;
+        //ifstream inFile(fName);
+        //ofstream ofile(fName);
+        //   fseek( fp, 7, SEEK_SET ); 7th byte in file
 
 
+        fstream file("EmployeeIndex", std::ios::binary | std::ios::in | std::ios::out);
 
-       
+        file.seekp(whereToStore);
 
-        while (getline(inFile, line)) {
-        std::istringstream iss(line);
-        std::string key;
-        std::getline(iss, key, '$'); // Assuming the first field is the search key
-
-        if (key == bit_location) {
-            ofile << line << "$" << record_id << "$" << to_string(offset);
-        } 
-    }
+        cout << "record_id: " << record_id << endl;
+        cout << "offset: " << offset << endl;
+        const char* str = (record_id + offset).c_str();
+        cout << "Record ID + offset: " << str << endl;
+        for (int i = 0; i < 16; i++){
+            file.put(str[i]);
+        }
         
+        file.close();
+
+
+            
 
     }
+
 };
