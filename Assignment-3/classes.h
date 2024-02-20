@@ -183,6 +183,9 @@ int binary_to_decimal(string bit_string){
         }
 
         int average_amount_array[216];
+        for(int x = 0; x<216;x++){
+            average_amount_array[x]=0;
+        }
         float average_fill = 0;
 
         while (getline(fin, line)){ //reads the entirety of the csv 
@@ -290,6 +293,8 @@ int binary_to_decimal(string bit_string){
 
         file.seekp(whereToStore);
 
+        cout << "record_id: " << record_id << endl;
+        cout << "offset: " << offset << endl;
         const char* str = (record_id + offset).c_str();
         cout << "Record ID + offset: " << str << endl;
         for (int i = 0; i < 16; i++){
