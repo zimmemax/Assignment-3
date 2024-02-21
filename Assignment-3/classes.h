@@ -44,6 +44,7 @@ private:
     int nextFreeBlock; // Next place to write a bucket. Should increment it by BLOCK_SIZE whenever a bucket is written to EmployeeIndex
     string fName;      // Name of index file
 
+    int recordPageTracker[216];
     int storageFill;
     // Insert new record into index
     void insertRecord(Record record) {
@@ -105,23 +106,44 @@ bool need_bit_flip(string num, int n){ //
 int binary_to_decimal(string bit_string){
     int num = 0;
 
-    for(int j=0; j < bit_string.length(); j++){
+    for(int j= bit_string.length()-1; j == 0; j--){
         if(bit_string[j]=='1'){
             num+=pow(2, j);
+            cout << "Num: " << num << endl;
         }
     }
     return num;
 
 }
 
+int binaryToDecimal(const std::string& binary) {
+    int decimal = 0;
+    int exponent = 0;
+    
+    // Iterate over the binary string from right to left
+    for (int i = binary.length() - 1; i >= 0; --i) {
+        if (binary[i] == '1') {
+            // If the current bit is '1', add 2^exponent to the decimal value
+            decimal += pow(2, exponent);
+        }
+        // Increment the exponent for the next bit
+        exponent++;
+    }
+    
+    return decimal;
+}
+
+
     public:
     string fname;
+    string indexFileName;
     LinearHashIndex(string indexFileName) {
         n = 4; // Start with 4 buckets in index
         i = 2; // Need 2 bits to address 4 buckets
         numRecords = 0;
         nextFreeBlock = 0;
         fName = indexFileName;
+        indexFileName = indexFileName;
         // Create your EmployeeIndex file and write out the initial 4 buckets
         // make sure to account for the created buckets by incrementing nextFreeBlock appropriately
         ofstream fout(fName);
@@ -138,21 +160,78 @@ int binary_to_decimal(string bit_string){
       
     }
 
+    void createFromFile(string csvFName) {
+        master(csvFName);
+    }
+
     int h(int id){
         return id%216;
     }
 
 
     //rehashes every page considering the new i value, must also rewrite the recordPageTracker array
-    void reformatPages(){
+    void reformatPages(int n){
+        
+        fstream fout("tmp.txt");
+        for(int j =0; j < n; j++){
+            string bit_string = decimalToBinary(j, i);
+            //write bit string to file
+            for(int q = 0; q< 16*20; q++){
+                //write<<" "
+            }
+        }
+
+
 
         return;
 
     }
 
-    // Read csv file and add records to the index
-    void createFromFile(string csvFName) {
+    void master(string csvFname){
+        //calculate i and n
+        //if chnage to n/i
+        //call create index
+        int lines_in_csv = 0;
+        int lines_written = 0;
+        fstream file(csvFname);
 
+        string line;
+        while (std::getline(file, line)) {
+        
+            lines_in_csv+=1;
+        }
+
+        while(true){
+            
+            lines_written = create_index(csvFname);
+            if(lines_written < lines_in_csv){
+                n++;
+                //cout << "num buckets: " << n << endl;
+                //cout << "lines written: " << lines_written << endl;
+            }
+            else{
+
+                //cout << "num buckets: " << n << endl;
+                //cout << "lines written: " << lines_written << endl;
+            
+                
+                return;
+            }
+            
+            
+        }
+    }
+
+    int create_index(string csvFName){
+        
+        remove("EmployeeIndex");
+        ofstream file("EmployeeIndex");
+
+        for(int j = 0; j < 20*16*n; j++){
+            file.put(' ');
+        }
+
+        int lines_written = 0;
         ifstream fin(csvFName);
 
         string id;
@@ -177,7 +256,6 @@ int binary_to_decimal(string bit_string){
         
         int line_num = 0;
 
-        int recordPageTracker[216];
         for (int i = 0; i < 216; i++){
             recordPageTracker[i] = 0;
         }
@@ -186,17 +264,16 @@ int binary_to_decimal(string bit_string){
         for(int x = 0; x<216;x++){
             average_amount_array[x]=0;
         }
-        float average_fill = 0;
+        float average_fill = 0.0;
 
         while (getline(fin, line)){ //reads the entirety of the csv 
 
+            if(n > pow(2,i)){
+                    i++;
+                }
 
-            int maxStorage = pow(2,i);
-            float percentageRecordsFilled = n / maxStorage;
-
-            if(percentageRecordsFilled > 70.0){ //i should only increase when average number of fill reaches above 70 %
-                i++;
-                reformatPages();
+            if(average_fill > 0.7){ //i should only increase when average number of fill reaches above 70 %
+                return lines_written; 
             }
 
             assert (page.size() <= BLOCK_SIZE);
@@ -216,64 +293,139 @@ int binary_to_decimal(string bit_string){
             int hash = h(stoi(id)); // hash is an integer [0, 255]
 
 
-            cout << "Hash: " << hash << endl;
+            //cout << "Hash: " << hash << endl;
 
             string bit_location = decimalToBinary(hash, i); // ex: 010 
-            cout << "Bit Location: " << bit_location << endl;
+            //cout << "Bit Location: " << bit_location << endl;
             
             
             
 
 
-            /*
+            
             if(need_bit_flip(bit_location, n)){ //not quite sure abt the criteria on this one
                 bit_location = bit_flip(bit_location);
-                cout << "Flipped " << endl;
+                //cout << "Flipped " << endl;
             }
 
-            cout << "After flip: " << bit_location << endl;
+            //cout << "After flip: " << bit_location << endl;
 
-            */
-            int whereToStore = 20 * 16 * binary_to_decimal(bit_location) + 16 * recordPageTracker[binary_to_decimal(bit_location)]; //20 is the number of entries possible in a bucket, 16 is the size of each record on the page, 
+            //cout << "bit location" << bit_location << endl;
+            int whereToStore = 20 * 16 * binaryToDecimal(bit_location) + (16 * recordPageTracker[binaryToDecimal(bit_location)]); //20 is the number of entries possible in a bucket, 16 is the size of each record on the page, 
             string offset = decimalToBinary(line_num, 8);
 
-            cout << "Where to store: " << whereToStore << endl;
-            cout << "Offset: " << offset << endl;
+            //cout << "Where to store: " << whereToStore << endl;
+            //cout << "Offset: " << offset << endl;
 
 
             insert_record(id, whereToStore, offset); //each page is a bucket >:)
 
-            recordPageTracker[binary_to_decimal(bit_location)]++; // this array will tell us where we've placed every single record. We can see if pages are full, i.e. recordpagetracker[i] > 5. We can also use it to track offset.
+            recordPageTracker[binaryToDecimal(bit_location)]++; // this array will tell us where we've placed every single record. We can see if pages are full, i.e. recordpagetracker[i] > 5. We can also use it to track offset.
             
 
            
             numRecords++;
             
             
-            cout << "Num Records: " << numRecords << endl;
-            int bit_location_to_int = binary_to_decimal(bit_location);
+            //cout << "Num Records: " << numRecords << endl;
+            int bit_location_to_int = binaryToDecimal(bit_location);
             average_amount_array[bit_location_to_int] +=1;
 
             for(int x =0; x<216;x++){
                 average_fill += average_amount_array[x];
             }
-            average_fill = average_fill/n;
-            cout << "Average fill: " << average_fill << endl;
+            average_fill = average_fill/(n * 5);
+            //cout << "Average fill: " << average_fill << endl;
 
 
            
             line_num++;
+            lines_written++;
             
 
         }
-
-
-        
+       
+       return lines_written;
     }
+
+
 
     // Given an ID, find the relevant record and print it
     Record findRecordById(int id) {
+        
+
+        string bit_String = decimalToBinary(h(id), i);
+        int line_Num_In_Csv;
+        
+        ifstream index_File("EmployeeIndex");
+        ifstream csv_File("Employee.csv");
+        char comparator [17];
+        char tmp1[8];
+        char tmp2[8];
+
+
+        int where_To_Find = 20 * 16 * binaryToDecimal(bit_String); //20 is the number of entries possible in a bucket, 16 is the size of each record on the page, 
+        index_File.seekg(where_To_Find);
+        for (int z = 0; z < 20*16; z+=16){
+
+            index_File.read(comparator, 16);
+            
+            
+
+            string str(comparator);
+
+            string firstEightChars = str.substr(0, 8);
+            string lastChars = str.substr(8, 16);
+
+            firstEightChars.resize(8);
+            lastChars.resize(8);
+
+
+            //cout << firstEightChars << endl;
+            //cout << lastChars << endl;
+            
+            if(stoi(firstEightChars) == id){
+                //seek to line num based on last 8 chars
+                
+                int line_num = binaryToDecimal(lastChars);
+                //cout << "Line num" << line_num << endl;
+
+                string id;
+                string manager_id;
+                string bio;
+                string name;
+
+                string line;
+
+                int line_counter = 0;
+                while (std::getline(csv_File, line))
+                {
+                    if (line_counter == line_num){
+                        istringstream ss(line);
+                        getline(ss, id, ',');
+                        getline(ss, name, ',');
+                        getline(ss, bio, ',');
+                        getline(ss, manager_id);
+                        vector<string> field;
+                        field.push_back(id);
+                        field.push_back(name);
+                        field.push_back(bio);
+                        field.push_back(manager_id);
+                        Record r(field);
+                        return r;
+                    }
+                    line_counter+=1;
+                    
+                }
+            }
+
+
+
+        }
+        
+   
         vector <string> fields;
+        fields[0] = '0';
         Record r(fields);
         return r;
     }
@@ -283,29 +435,17 @@ int binary_to_decimal(string bit_string){
 
     void insert_record(string record_id, int whereToStore, string offset){
        
-        //string line;
-        //ifstream inFile(fName);
-        //ofstream ofile(fName);
-        //   fseek( fp, 7, SEEK_SET ); 7th byte in file
-
-
         fstream file("EmployeeIndex", std::ios::binary | std::ios::in | std::ios::out);
 
         file.seekp(whereToStore);
 
-        cout << "record_id: " << record_id << endl;
-        cout << "offset: " << offset << endl;
-        const char* str = (record_id + offset).c_str();
-        cout << "Record ID + offset: " << str << endl;
+
+        string str = record_id + offset;
+
         for (int i = 0; i < 16; i++){
             file.put(str[i]);
         }
         
         file.close();
-
-
-            
-
     }
-
 };
